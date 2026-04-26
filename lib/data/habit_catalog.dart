@@ -48,9 +48,10 @@ class HabitCatalog {
           HabitBenefit(label: 'Autoestima', bonusValue: 20, iconType: 'face'),
         ],
         tasks: [
-          Task(title: 'Limpeza facial', impactTag: 'SAÚDE', xpValue: 10),
-          Task(title: 'Tratamento (Ativos/Ácidos)', impactTag: 'SAÚDE', xpValue: 10),
-          Task(title: 'Hidratação e Protetor Solar', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Limpeza dupla', impactTag: 'SAÚDE', xpValue: 5),
+          Task(title: 'Hidratante', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Acido', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Protetor solar', impactTag: 'SAÚDE', xpValue: 5),
         ],
       ),
       _buildHabit(
@@ -67,8 +68,9 @@ class HabitCatalog {
           HabitBenefit(label: 'Sanidade', bonusValue: 25, iconType: 'spa'),
         ],
         tasks: [
-          Task(title: 'Sem telas 1 hora antes de deitar', impactTag: 'SANIDADE', xpValue: 15),
-          Task(title: 'Dormir entre 7 e 8 horas', impactTag: 'SAÚDE', xpValue: 20),
+          Task(title: 'Sem telas 1h antes de deitar', impactTag: 'SANIDADE', xpValue: 15),
+          Task(title: 'Dormir às 9h', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Acordar às 5h', impactTag: 'SAÚDE', xpValue: 10),
         ],
       ),
       _buildHabit(
@@ -103,12 +105,13 @@ class HabitCatalog {
         ],
         tasks: [
           Task(title: 'Zero delivery de Fast Food hoje', impactTag: 'SAÚDE', xpValue: 15),
-          Task(title: 'Não consumir doces/açúcar refinado', impactTag: 'FÍSICO', xpValue: 15),
+          Task(title: 'Não consumir fritura/açúcar refinado', impactTag: 'FÍSICO', xpValue: 15),
+          Task(title: 'Não comer entre refeiçções', impactTag: 'FÍSICO', xpValue: 15),
         ],
       ),
       _buildHabit(
         id: 'jornal_diario',
-        title: 'Jornal Diário',
+        title: 'Jornal',
         category: 'MENTAL',
         duration: '30 DIAS',
         imageUrl: 'assets/images/jornal.png',
@@ -120,7 +123,7 @@ class HabitCatalog {
           HabitBenefit(label: 'Social', bonusValue: 10, iconType: 'people'),
         ],
         tasks: [
-          Task(title: 'Registrar progresso do dia', impactTag: 'INTELIGENCIA', xpValue: 10),
+          Task(title: 'Escrever 1 página', impactTag: 'INTELIGENCIA', xpValue: 10),
         ],
       ),
     ];
