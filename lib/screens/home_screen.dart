@@ -8,7 +8,6 @@ import '../services/level_service.dart';
 import '../services/attribute_service.dart'; 
 import '../widgets/custom_drawer.dart';
 import '../models/task.dart';
-import '../services/checkin_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,8 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color colorText = const Color(0xFFFEFFFC);
 
   List<Habit> activeHabits = [];
-  Map<String, double> overallProgressMap = {}; 
-  List<String> checkinHistory = []; 
+  Map<String, double> overallProgressMap = {}; // Controla o progresso de longo prazo (30 dias)
   bool isLoading = true;
   int totalXp = 0;
 
@@ -37,25 +35,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  // Lógica de carregamento com verificação de reset diário e injeção de tasks
   Future<void> _loadData() async {
     setState(() => isLoading = true);
     
+    // 1. Carrega os hábitos ativos do disco
     List<Habit> habits = await StorageService.loadActiveHabits();
     
+    // 2. COLD START CHECK: Se a lista estiver vazia, popula com o catálogo
     if (habits.isEmpty) {
       final catalog = HabitCatalog.getAvailableHabits();
       await StorageService.updateHabitsFromCatalog(catalog);
       habits = await StorageService.loadActiveHabits();
     }
     
+    // 3. Verifica se o dia mudou para resetar as tarefas visuais (00:00)
     await HabitService.checkDailyReset(habits);
+
+    // 4. Executa a injeção do tópico de HOJE (AWS e Treino)
     await HabitService.checkAWSTasks(habits); 
     await HabitService.checkWorkoutTask(habits);
+
+    // 5. Salva o estado atualizado para garantir persistência
     await StorageService.saveActiveHabits(habits);
 
+    // 6. Carrega o XP total e calcula o progresso acumulado (30 dias)
     final xp = await LevelService.getTotalXp();
-    final history = await CheckinService.getCheckinHistory();
-
     Map<String, double> progressMap = {};
     for (var h in habits) {
       progressMap[h.id] = await HabitService.getOverallProgress(h);
@@ -65,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
       activeHabits = habits; 
       overallProgressMap = progressMap;
       totalXp = xp;
-      checkinHistory = history;
       isLoading = false;
     });
   }
@@ -79,19 +83,23 @@ class _HomeScreenState extends State<HomeScreen> {
       task.isCompleted = isNowCompleted;
     });
 
+    // Lógica de RPG bidirecional (XP e Atributos)
     if (isNowCompleted) {
+      // CORREÇÃO AQUI: Passando o task.xpValue para o motor de Level
       totalXp = await LevelService.addXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: true);
-      await CheckinService.checkInToday(); 
     } else {
+      // CORREÇÃO AQUI: Passando o task.xpValue para o motor de Level
       totalXp = await LevelService.removeXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: false);
     }
 
+    // Persiste a mudança e loga o progresso do dia no histórico
     await StorageService.saveActiveHabits(activeHabits);
     await HabitService.logHabitAction(habit.id, habit.dayProgress * 100);
+    
+    // Atualiza a barra de 30 dias em tempo real
     overallProgressMap[habit.id] = await HabitService.getOverallProgress(habit);
-    checkinHistory = await CheckinService.getCheckinHistory();
     
     setState(() {}); 
   }
@@ -126,25 +134,16 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: const CustomDrawer(),
       body: Column(
         children: [
-          // NÍVEL GLOBAL (Fixo no topo da tela)
           _buildLevelHeader(),
-          
-          // ÁREA ROLÁVEL (Calendário + Cards)
           Expanded(
-            child: ListView(
-              key: const PageStorageKey('main_habit_scroll'),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              children: [
-                
-                // O calendário agora rola junto com os cards
-                _buildMonthlyCheckinBlocks(),
-
-                if (activeHabits.isEmpty) 
-                  _buildEmptyState()
-                else 
-                  ...activeHabits.asMap().entries.map((entry) => _buildHabitCard(entry.value, entry.key)),
-              ],
-            ),
+            child: activeHabits.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    key: const PageStorageKey('main_habit_scroll'),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    itemCount: activeHabits.length,
+                    itemBuilder: (context, index) => _buildHabitCard(activeHabits[index], index),
+                  ),
           ),
         ],
       ),
@@ -157,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
     int nextLevelXp = LevelService.xpPerLevel - (totalXp % LevelService.xpPerLevel);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
       decoration: BoxDecoration(
         color: colorSurface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(32),
@@ -168,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Padding(
+            // Preenchimento interno para evitar corte de glifos inclinados
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
@@ -210,82 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMonthlyCheckinBlocks() {
-    DateTime now = DateTime.now();
-    int daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    String currentMonthStr = now.month.toString().padLeft(2, '0');
-    String currentYearStr = now.year.toString();
-
-    return Container(
-      // A margem lateral foi removida para alinhar com os cards dentro do ListView
-      margin: const EdgeInsets.only(bottom: 24), 
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorSurface.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("CHECK-IN MENSAL", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
-              Icon(Icons.calendar_view_month, color: Colors.white24, size: 16),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(daysInMonth, (index) {
-              int day = index + 1;
-              String dayStr = day.toString().padLeft(2, '0');
-              String dateToCheck = "$currentYearStr-$currentMonthStr-$dayStr";
-              
-              bool isCheckedIn = checkinHistory.contains(dateToCheck);
-              bool isFuture = day > now.day;
-              bool isToday = day == now.day;
-
-              Color blockColor;
-              Color borderColor;
-
-              if (isCheckedIn) {
-                blockColor = colorAccent; 
-                borderColor = colorAccent;
-              } else if (isFuture) {
-                blockColor = Colors.transparent; 
-                borderColor = Colors.white.withOpacity(0.05);
-              } else {
-                blockColor = Colors.white.withOpacity(0.05); 
-                borderColor = Colors.transparent;
-              }
-
-              if (isToday && !isCheckedIn) {
-                borderColor = colorAccent.withOpacity(0.5);
-              }
-
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: blockColor,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: borderColor, width: 1.5),
-                  boxShadow: isCheckedIn ? [
-                    BoxShadow(color: colorAccent.withOpacity(0.3), blurRadius: 4, spreadRadius: 1)
-                  ] : [],
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHabitCard(Habit habit, int habitIndex) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -314,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
                 const SizedBox(height: 12),
                 
+                // Barra baseada no progresso acumulado de 30 dias
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
@@ -375,18 +300,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 40),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.layers_clear, size: 60, color: colorPrimary.withOpacity(0.2)),
-            const SizedBox(height: 16),
-            Text("MODO STANDBY ATIVO", 
-              style: TextStyle(color: colorPrimary.withOpacity(0.5), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 3)),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.layers_clear, size: 60, color: colorPrimary.withOpacity(0.2)),
+          const SizedBox(height: 16),
+          Text("MODO STANDBY ATIVO", 
+            style: TextStyle(color: colorPrimary.withOpacity(0.5), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 3)),
+        ],
       ),
     );
   }
