@@ -71,6 +71,8 @@ class HabitCatalog {
           Task(title: 'Sem telas 1h antes de deitar', impactTag: 'SANIDADE', xpValue: 15),
           Task(title: 'Dormir às 9h', impactTag: 'SAÚDE', xpValue: 10),
           Task(title: 'Acordar às 5h', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Tomar Melatonina', impactTag: 'SAÚDE', xpValue: 10),
+          Task(title: 'Rastreador de sono e ruído branco', impactTag: 'SAÚDE', xpValue: 10),
         ],
       ),
       _buildHabit(

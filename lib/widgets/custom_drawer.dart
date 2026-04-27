@@ -5,7 +5,8 @@ import '../screens/manage_goals_screen.dart';
 import '../screens/goal_selection_screen.dart';
 import '../screens/body_stats_screen.dart';
 import '../screens/profile_screen.dart';
-import '../screens/level_screen.dart'; // IMPORT DA NOVA TELA
+import '../screens/level_screen.dart';
+import '../screens/checkin_screen.dart'; // Importação da nova tela de Ofensiva
 
 class CustomDrawer extends StatefulWidget {
   const CustomDrawer({super.key});
@@ -33,7 +34,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
     });
   }
 
-  // Função de navegação fluida e segura
+  // Função de navegação fluida com transição de slide e fade
   void _animatedNavigate(BuildContext context, Widget screen) {
     Navigator.pop(context); // Fecha o drawer antes de navegar
     
@@ -57,22 +58,20 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    const Color colorPrimary = Color(0xFF8116E0); // Roxo
-    const Color colorAccent = Color(0xFFD0FF00);  // Verde Ácido
+    const Color colorPrimary = Color(0xFF8116E0); // Roxo Destaque
+    const Color colorAccent = Color(0xFFD0FF00);  // Verde Neon
     const Color colorText = Color(0xFFFEFFFC);
 
     return Drawer(
       backgroundColor: const Color(0xFF0A0A0A),
       child: Column(
         children: [
-          // HEADER COM FOTO E NOME
           UserAccountsDrawerHeader(
             margin: EdgeInsets.zero,
             decoration: const BoxDecoration(
               color: Color(0xFF0A0A0A),
               border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
             ),
-            // FOTO DE PERFIL AGORA ENVOLVIDA COM GESTUREDETECTOR
             currentAccountPicture: GestureDetector(
               onTap: () => _animatedNavigate(context, const ProfileScreen()),
               child: Container(
@@ -114,9 +113,15 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   onTap: () => _animatedNavigate(context, const ProfileScreen()),
                 ),
                 _buildDrawerItem(
-                  icon: Icons.military_tech, // ÍCONE DE MEDALHA PARA O LEVEL
+                  icon: Icons.military_tech,
                   label: "LEVEL",
                   onTap: () => _animatedNavigate(context, const LevelScreen()),
+                ),
+                // ITEM NOVO: Acessar o sistema de Ofensiva/Streak
+                _buildDrawerItem(
+                  icon: Icons.local_fire_department,
+                  label: "OFENSIVA",
+                  onTap: () => _animatedNavigate(context, const CheckinScreen()),
                 ),
                 _buildDrawerItem(
                   icon: Icons.home_filled,
@@ -145,7 +150,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
           const Padding(
             padding: EdgeInsets.all(20),
             child: Text(
-              "LifeReset v1.3.0", // Versão atualizada com sistema de Level
+              "LifeReset v1.4.0", // Versão atualizada com Sistema de Ofensiva
               style: TextStyle(color: Colors.white10, fontSize: 10, letterSpacing: 2)
             ),
           ),
