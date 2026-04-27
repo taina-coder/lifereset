@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:fl_chart/fl_chart.dart'; 
 import '../models/attribute_stats.dart';
 import '../services/storage_service.dart';
 import '../services/level_service.dart'; 
@@ -12,16 +13,17 @@ class LevelScreen extends StatefulWidget {
 }
 
 class _LevelScreenState extends State<LevelScreen> {
-  // PALETA CYBER-TECH EXPANDIDA (Cores exclusivas para cada categoria)
-  final Color colorAccent = const Color(0xFFD0FF00);       // Verde Neon
-  final Color colorAccentDark = const Color(0xFF88A600);   // Verde Tech
-  final Color colorAccentLight = const Color(0xFFE8FF80);  // Verde Menta
-  
-  final Color colorPrimary = const Color(0xFF8116E0);      // Roxo Original
-  final Color colorPrimaryLight = const Color(0xFFA64DFF); // Roxo Neon
-  final Color colorPrimarySuperLight = const Color(0xFFD9B3FF); // Lilás
+  // Paleta Cyber-Tech
+  final Color colorAccent = const Color(0xFF8116E0);       
+  final Color colorAccentLight = const Color(0xFFA64DFF);  
+  final Color colorPrimary = const Color(0xFFD0FF00);      
   
   final Color colorSurface = const Color(0xFF121212);
+  final Color colorBackground = const Color(0xFF0A0A0A);
+
+  // CONFIGURAÇÕES DE LEVEL DOS ATRIBUTOS
+  final int maxAttributeLevel = 50;
+  final double xpPerAttributeLevel = 150.0;
 
   AttributeStats stats = AttributeStats();
   bool isLoading = true;
@@ -34,9 +36,7 @@ class _LevelScreenState extends State<LevelScreen> {
   }
 
   Future<void> _loadData() async {
-    // Carrega os atributos preservando os dados existentes
     final loadedStats = await StorageService.loadAttributeStats();
-    // Busca o XP global para sincronia total com a Home
     final xp = await LevelService.getTotalXp(); 
     
     setState(() {
@@ -46,20 +46,32 @@ class _LevelScreenState extends State<LevelScreen> {
     });
   }
 
+  // Lógica de Nível para os Atributos (Converte o XP bruto em Nível)
+  int _getAttributeLevel(double rawXp) {
+    int lvl = (rawXp / xpPerAttributeLevel).floor() + 1;
+    return lvl > maxAttributeLevel ? maxAttributeLevel : lvl;
+  }
+
+  // Lógica da barra de progresso do Atributo até o PRÓXIMO nível
+  double _getAttributeProgress(double rawXp) {
+    if (_getAttributeLevel(rawXp) >= maxAttributeLevel) return 1.0;
+    return (rawXp % xpPerAttributeLevel) / xpPerAttributeLevel;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (isLoading) return const Scaffold(backgroundColor: Color(0xFF0A0A0A), body: Center(child: CircularProgressIndicator()));
+    if (isLoading) return Scaffold(backgroundColor: colorBackground, body: Center(child: CircularProgressIndicator(color: colorAccent)));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A), 
+      backgroundColor: colorBackground, 
       appBar: AppBar(
-        title: const Text("STATUS_DO_SISTEMA", 
-          style: TextStyle(letterSpacing: 3, fontWeight: FontWeight.w900, fontSize: 14)),
+        title: const Text("STATUS_DO_SISTEMA", style: TextStyle(letterSpacing: 3, fontWeight: FontWeight.w900, fontSize: 14)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
       ),
       body: RefreshIndicator(
+        color: colorAccent,
         onRefresh: _loadData,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -67,33 +79,28 @@ class _LevelScreenState extends State<LevelScreen> {
             children: [
               _buildMainLevelCard(),
               const SizedBox(height: 32),
+              _buildRadarChartSection(),
+              const SizedBox(height: 32),
               
-              // SEÇÃO 1: CORPO E VITALIDADE
               _buildAttributeSection("CORPO & VITALIDADE", [
                 _buildStatBar("FÍSICO", stats.physique, colorAccent),
-                _buildStatBar("ESTAMINA", stats.stamina, colorAccentDark),
+                _buildStatBar("ESTAMINA", stats.stamina, const Color(0xFF4D0099)), 
                 _buildStatBar("SAÚDE", stats.health, Colors.white),
               ]),
               
               const SizedBox(height: 24),
-              
-              // SEÇÃO 2: MENTE E COGNIÇÃO
               _buildAttributeSection("MENTE & COGNIÇÃO", [
-                _buildStatBar("INTELIGÊNCIA", stats.intellect, colorPrimaryLight),
+                _buildStatBar("INTELIGÊNCIA", stats.intellect, colorPrimary), 
                 _buildStatBar("SANIDADE", stats.sanity, colorPrimary),
               ]),
 
               const SizedBox(height: 24),
-              
-              // SEÇÃO 3: IMAGEM E PRESENÇA
               _buildAttributeSection("IMAGEM & PRESENÇA", [
-                _buildStatBar("APARÊNCIA", stats.appearance, colorAccentLight),
-                _buildStatBar("AUTOESTIMA", stats.selfEsteem, colorPrimarySuperLight),
+                _buildStatBar("APARÊNCIA", stats.appearance, const Color(0xFFD9B3FF)), 
+                _buildStatBar("AUTOESTIMA", stats.selfEsteem, const Color(0xFFD9B3FF)),
               ]),
 
               const SizedBox(height: 24),
-
-              // SEÇÃO 4: IMPACTO EXTERNO
               _buildAttributeSection("IMPACTO EXTERNO", [
                 _buildStatBar("CARREIRA", stats.career, Colors.grey[400]!),
                 _buildStatBar("SOCIAL", stats.social, Colors.grey[700]!),
@@ -121,19 +128,14 @@ class _LevelScreenState extends State<LevelScreen> {
           decoration: BoxDecoration(
             color: colorSurface.withOpacity(0.5),
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: colorPrimary.withOpacity(0.3)),
+            border: Border.all(color: colorAccent.withOpacity(0.3)), 
           ),
           child: Column(
             children: [
-              Text("LEVEL", style: TextStyle(color: colorPrimary, fontWeight: FontWeight.bold, letterSpacing: 5)),
+              Text("GLOBAL LEVEL", style: TextStyle(color: colorAccent, fontWeight: FontWeight.bold, letterSpacing: 5)),
               Text("$level", style: const TextStyle(color: Colors.white, fontSize: 64, fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
-              LinearProgressIndicator(
-                value: progress, 
-                backgroundColor: Colors.white.withOpacity(0.05),
-                color: colorAccent, 
-                minHeight: 2,
-              ),
+              LinearProgressIndicator(value: progress, backgroundColor: Colors.white.withOpacity(0.05), color: colorAccentLight, minHeight: 2),
             ],
           ),
         ),
@@ -141,36 +143,99 @@ class _LevelScreenState extends State<LevelScreen> {
     );
   }
 
-  Widget _buildAttributeSection(String title, List<Widget> statsList) {
+  Widget _buildRadarChartSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
-        const SizedBox(height: 16),
-        ...statsList,
+        const Text("MAPA DE ATRIBUTOS (LVL MAX 50)", style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        const SizedBox(height: 24),
+        Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: colorSurface, borderRadius: BorderRadius.circular(32), border: Border.all(color: Colors.white.withOpacity(0.02))),
+          child: RadarChart(
+            RadarChartData(
+              radarBorderData: const BorderSide(color: Colors.transparent),
+              gridBorderData: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
+              tickBorderData: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
+              tickCount: 5, 
+              ticksTextStyle: const TextStyle(color: Colors.transparent), 
+              titlePositionPercentageOffset: 0.15, 
+              titleTextStyle: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+              getTitle: (index, angle) {
+                switch (index) {
+                  case 0: return const RadarChartTitle(text: 'FÍSICO');
+                  case 1: return const RadarChartTitle(text: 'SANIDADE');
+                  case 2: return const RadarChartTitle(text: 'AUTOESTIMA');
+                  case 3: return const RadarChartTitle(text: 'SOCIAL');
+                  case 4: return const RadarChartTitle(text: 'INTELECTO');
+                  case 5: return const RadarChartTitle(text: 'VITALIDADE');
+                  default: return const RadarChartTitle(text: '');
+                }
+              },
+              dataSets: [
+                // DATASET INVISÍVEL: Trava a teia para que o teto seja sempre Level 50
+                RadarDataSet(
+                  fillColor: Colors.transparent,
+                  borderColor: Colors.transparent,
+                  entryRadius: 0,
+                  dataEntries: [
+                    RadarEntry(value: maxAttributeLevel.toDouble()), 
+                    RadarEntry(value: maxAttributeLevel.toDouble()), 
+                    RadarEntry(value: maxAttributeLevel.toDouble()),
+                    RadarEntry(value: maxAttributeLevel.toDouble()), 
+                    RadarEntry(value: maxAttributeLevel.toDouble()), 
+                    RadarEntry(value: maxAttributeLevel.toDouble()),
+                  ],
+                ),
+                // DATASET REAL: Com a sua evolução verdadeira
+                RadarDataSet(
+                  fillColor: colorAccent.withOpacity(0.3), 
+                  borderColor: colorAccentLight,           
+                  borderWidth: 3,
+                  entryRadius: 4,                          
+                  dataEntries: [
+                    RadarEntry(value: _getAttributeLevel(stats.physique).toDouble()),
+                    RadarEntry(value: _getAttributeLevel(stats.sanity).toDouble()),
+                    RadarEntry(value: _getAttributeLevel(stats.selfEsteem).toDouble()),
+                    RadarEntry(value: _getAttributeLevel(stats.social).toDouble()),
+                    RadarEntry(value: _getAttributeLevel(stats.intellect).toDouble()),
+                    RadarEntry(value: _getAttributeLevel(stats.health).toDouble()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildStatBar(String label, double progress, Color color) {
+  Widget _buildAttributeSection(String title, List<Widget> statsList) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+      const SizedBox(height: 16),
+      ...statsList,
+    ]);
+  }
+
+  Widget _buildStatBar(String label, double rawXp, Color color) {
+    int currentLevel = _getAttributeLevel(rawXp);
+    double progressToNextLevel = _getAttributeProgress(rawXp);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold))),
+          SizedBox(width: 110, child: Text("$label LVL.$currentLevel", style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold))),
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                backgroundColor: Colors.white.withOpacity(0.05),
-                color: color,
-                minHeight: 8,
-              ),
+              child: LinearProgressIndicator(value: progressToNextLevel, backgroundColor: Colors.white.withOpacity(0.05), color: color, minHeight: 8),
             ),
           ),
           const SizedBox(width: 12),
-          Text("${(progress * 100).toInt()}%", style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text("${(progressToNextLevel * 100).toInt()}%", style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
         ],
       ),
     );
