@@ -85,10 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Lógica de RPG bidirecional (XP e Atributos)
     if (isNowCompleted) {
-      totalXp = await LevelService.addXp();
+      // CORREÇÃO AQUI: Passando o task.xpValue para o motor de Level
+      totalXp = await LevelService.addXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: true);
     } else {
-      totalXp = await LevelService.removeXp();
+      // CORREÇÃO AQUI: Passando o task.xpValue para o motor de Level
+      totalXp = await LevelService.removeXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: false);
     }
 

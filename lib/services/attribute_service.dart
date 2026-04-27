@@ -1,74 +1,54 @@
-import '../models/attribute_stats.dart'; 
-import 'storage_service.dart';
 import '../models/task.dart';
+import '../models/attribute_stats.dart';
+import '../services/storage_service.dart';
 
 class AttributeService {
-  
-  // Adicionamos o parâmetro 'isAdding' para saber se deve somar ou subtrair
-  static Future<void> applyTaskReward(Task task, {bool isAdding = true}) async {
-    // 1. Carrega os stats atuais do Storage
-    AttributeStats currentStats = await StorageService.loadAttributeStats();
+  static Future<void> applyTaskReward(Task task, {required bool isAdding}) async {
+    AttributeStats stats = await StorageService.loadAttributeStats();
     
-    // 2. Define o multiplicador (1 para somar, -1 para subtrair)
-    double multiplier = isAdding ? 1.0 : -1.0;
-    double points = (task.xpValue / 100) * multiplier; 
-    double xpChange = task.xpValue * multiplier;
+    // Pega o valor real de XP da tarefa configurada no catálogo
+    double amount = task.xpValue; 
+    
+    if (!isAdding) amount = -amount;
 
-    // 3. Aplica ou remove o status conforme a tag da task
-    switch (task.impactTag.toUpperCase()) {
+    String tag = task.impactTag.toUpperCase().trim();
+
+    // Mapeamento à prova de falhas
+    switch (tag) {
       case 'FISICO':
-        currentStats.physique += points;
-        currentStats.stamina += (points * 0.5);
+      case 'FÍSICO':
+        stats.physique = (stats.physique + amount).clamp(0.0, double.infinity);
+        break;
+      case 'SAÚDE':
+      case 'SAUDE':
+        stats.health = (stats.health + amount).clamp(0.0, double.infinity);
         break;
       case 'INTELIGENCIA':
-        currentStats.intellect += points;
-        // Bônus para AWS e SQL também é removido se desmarcar
-        if (task.title.toUpperCase().contains('AWS') || task.title.toUpperCase().contains('SQL')) {
-          currentStats.intellect += (0.02 * multiplier);
-        }
+      case 'INTELIGÊNCIA':
+        stats.intellect = (stats.intellect + amount).clamp(0.0, double.infinity);
         break;
       case 'SANIDADE':
-        currentStats.sanity += points; 
+        stats.sanity = (stats.sanity + amount).clamp(0.0, double.infinity);
         break;
-      case 'SAUDE':
-        currentStats.health += points;
+      case 'APARÊNCIA':
+      case 'APARENCIA':
+        stats.appearance = (stats.appearance + amount).clamp(0.0, double.infinity);
         break;
-      case 'ESTAMINA':
-        currentStats.stamina += points;
+      case 'AUTOESTIMA':
+        stats.selfEsteem = (stats.selfEsteem + amount).clamp(0.0, double.infinity);
+        break;
+      case 'CARREIRA':
+        stats.career = (stats.career + amount).clamp(0.0, double.infinity);
+        break;
+      case 'SOCIAL':
+        stats.social = (stats.social + amount).clamp(0.0, double.infinity);
+        break;
+      default:
+        // Segurança: Se a tag não for encontrada, o XP vai para Estamina
+        stats.stamina = (stats.stamina + amount).clamp(0.0, double.infinity); 
         break;
     }
 
-    // 4. Lógica de Level Geral (XP acumulado)
-    currentStats.currentLevelXp += xpChange;
-    
-    // Sobe de nível a cada 100 XP
-    if (currentStats.currentLevelXp >= 100.0) { 
-      currentStats.totalLevel += 1;
-      currentStats.currentLevelXp -= 100.0; // Mantém o resto do XP
-    } 
-    // Desce de nível se o XP ficar negativo (correção de erro)
-    else if (currentStats.currentLevelXp < 0 && currentStats.totalLevel > 1) {
-      currentStats.totalLevel -= 1;
-      currentStats.currentLevelXp += 100.0;
-    }
-
-    // Garante que o nível mínimo seja 1 e o XP não fique negativo no level 1
-    if (currentStats.totalLevel < 1) currentStats.totalLevel = 1;
-    if (currentStats.totalLevel == 1 && currentStats.currentLevelXp < 0) {
-      currentStats.currentLevelXp = 0;
-    }
-
-    // 5. Clamping e Sincronização
-    _normalizeStats(currentStats);
-    await StorageService.saveLevel(currentStats.totalLevel);
-    await StorageService.saveAttributeStats(currentStats);
-  }
-
-  static void _normalizeStats(AttributeStats stats) {
-    stats.physique = stats.physique.clamp(0.0, 1.0);
-    stats.intellect = stats.intellect.clamp(0.0, 1.0);
-    stats.sanity = stats.sanity.clamp(0.0, 1.0);
-    stats.health = stats.health.clamp(0.0, 1.0);
-    stats.stamina = stats.stamina.clamp(0.0, 1.0);
+    await StorageService.saveAttributeStats(stats);
   }
 }
