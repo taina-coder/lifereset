@@ -19,8 +19,8 @@ class LifeResetApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color colorPrimary = Color(0xFF8116E0);
-    const Color colorAccent = Color(0xFFD0FF00);
+    const Color colorPrimary = Color(0xFFD0FF00);
+    const Color colorAccent = Color(0xFF8116E0);
     // ignore: unused_local_variable
     const Color colorText = Color(0xFFFEFFFC);
 
