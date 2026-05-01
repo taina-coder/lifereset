@@ -5,13 +5,12 @@ import 'package:life_reset/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    // Adicionado o parâmetro obrigatório startWithOnboarding
-    await tester.pumpWidget(const LifeResetApp(startWithOnboarding: false));
+    // Inicializa o app passando a rota inicial corrigida
+    await tester.pumpWidget(const LifeResetApp(initialRoute: '/home'));
 
-    // O restante do teste pode permanecer igual, 
-    // mas note que se o seu app não tiver um contador na Home, 
-    // este teste padrão do Flutter irá falhar na execução.
+    // O restante do teste padrão do Flutter foi mantido.
+    // Como o Life Reset tem uma interface própria, esse teste específico 
+    // de contador pode falhar, mas o erro de compilação estará resolvido!
     expect(find.text('0'), findsOneWidget);
     expect(find.text('1'), findsNothing);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui'; 
 import 'package:table_calendar/table_calendar.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; // Pacote adicionado
 import '../models/habit.dart';
 import '../data/habit_catalog.dart';
 import '../services/storage_service.dart';
@@ -43,12 +44,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     setState(() => isLoading = true);
     
+    // Recupera os protocolos que o usuário aceitou na tela anterior
+    final prefs = await SharedPreferences.getInstance();
+    final acceptedProtocols = prefs.getStringList('accepted_protocols') ?? [];
+    
     List<Habit> habits = await StorageService.loadActiveHabits();
     
+    // Filtra o carregamento inicial para exibir apenas o que foi aceito
     if (habits.isEmpty) {
       final catalog = HabitCatalog.getAvailableHabits();
-      await StorageService.updateHabitsFromCatalog(catalog);
+      
+      final filteredCatalog = catalog.where((habit) {
+        return acceptedProtocols.contains(habit.id) || acceptedProtocols.contains(habit.title);
+      }).toList();
+
+      await StorageService.updateHabitsFromCatalog(filteredCatalog);
       habits = await StorageService.loadActiveHabits();
+    } else {
+      // Garante que, mesmo que já existam hábitos salvos, apenas os aceitos sejam renderizados
+      if (acceptedProtocols.isNotEmpty) {
+         habits = habits.where((habit) {
+           return acceptedProtocols.contains(habit.id) || acceptedProtocols.contains(habit.title);
+         }).toList();
+      }
     }
     
     await HabitService.checkDailyReset(habits);
@@ -120,8 +138,16 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: Icon(Icons.cloud_sync, color: colorAccent),
             onPressed: () async {
+              // Aplica a mesma lógica de filtro na hora de sincronizar
+              final prefs = await SharedPreferences.getInstance();
+              final acceptedProtocols = prefs.getStringList('accepted_protocols') ?? [];
+
               final catalog = HabitCatalog.getAvailableHabits();
-              await StorageService.updateHabitsFromCatalog(catalog);
+              final filteredCatalog = catalog.where((habit) {
+                return acceptedProtocols.contains(habit.id) || acceptedProtocols.contains(habit.title);
+              }).toList();
+
+              await StorageService.updateHabitsFromCatalog(filteredCatalog);
               _loadData();
             },
           ),

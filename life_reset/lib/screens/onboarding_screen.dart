@@ -41,8 +41,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await StorageService.savePlayer(newPlayer);
     
     if (mounted) {
-      // Navega para a Home e limpa a pilha de telas
-      Navigator.pushReplacementNamed(context, '/home');
+      // MUDANÇA AQUI: Navega para a tela de Seleção de Protocolos em vez da Home
+      Navigator.pushReplacementNamed(context, '/protocols');
     }
   }
 

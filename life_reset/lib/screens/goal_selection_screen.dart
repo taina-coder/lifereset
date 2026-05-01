@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart'; // Pacote adicionado
 import '../models/habit.dart';
 import '../data/habit_catalog.dart' as catalog;
 import '../services/storage_service.dart';
@@ -51,8 +52,24 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
       }
     }
     
+    // 1. Salva no StorageService (sua lógica original mantida)
     await StorageService.saveActiveHabits(habitsToSave);
-    if (mounted) Navigator.pop(context, true);
+
+    // 2. NOVA LÓGICA: Salva no SharedPreferences para a HomeScreen filtrar e para o fluxo inicial
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('accepted_protocols', selectedIds.toList());
+    await prefs.setBool('hasSelectedProtocol', true);
+    
+    if (mounted) {
+      // Navegação inteligente:
+      // Se tiver como dar pop (ex: abriu pelo menu lateral), ele fecha a tela.
+      // Se não tiver (ex: veio direto do onboarding), manda pra Home.
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context, true);
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    }
   }
 
   @override
