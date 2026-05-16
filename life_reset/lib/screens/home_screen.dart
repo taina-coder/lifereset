@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:ui'; 
-import 'package:table_calendar/table_calendar.dart'; 
 import '../models/habit.dart';
 import '../data/habit_catalog.dart';
 import '../services/storage_service.dart';
 import '../services/habit_service.dart';
 import '../services/level_service.dart';
 import '../services/attribute_service.dart'; 
-import '../services/checkin_service.dart'; 
 import '../widgets/custom_drawer.dart';
 import '../models/task.dart';
+import '../services/checkin_service.dart';
+import '../widgets/add_load_dialog.dart'; // NOVO: Importação do widget de registrar carga
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,9 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Habit> activeHabits = [];
   Map<String, double> overallProgressMap = {}; 
-  
   List<String> checkinHistory = []; 
-  
   bool isLoading = true;
   int totalXp = 0;
 
@@ -68,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
       activeHabits = habits; 
       overallProgressMap = progressMap;
       totalXp = xp;
-      checkinHistory = history; 
+      checkinHistory = history;
       isLoading = false;
     });
   }
@@ -93,9 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await StorageService.saveActiveHabits(activeHabits);
     await HabitService.logHabitAction(habit.id, habit.dayProgress * 100);
-    
     overallProgressMap[habit.id] = await HabitService.getOverallProgress(habit);
-    checkinHistory = await CheckinService.getCheckinHistory(); 
+    checkinHistory = await CheckinService.getCheckinHistory();
     
     setState(() {}); 
   }
@@ -130,98 +127,27 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: const CustomDrawer(),
       body: Column(
         children: [
+          // NÍVEL GLOBAL (Fixo no topo da tela)
           _buildLevelHeader(),
           
+          // ÁREA ROLÁVEL (Calendário + Cards)
           Expanded(
-            child: activeHabits.isEmpty
-                ? Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: _buildMiniCalendar(),
-                      ),
-                      Expanded(child: _buildEmptyState()),
-                    ],
-                  )
-                : ListView.builder(
-                    key: const PageStorageKey('main_habit_scroll'),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    itemCount: activeHabits.length + 1, 
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          child: _buildMiniCalendar(),
-                        );
-                      }
-                      return _buildHabitCard(activeHabits[index - 1], index - 1);
-                    },
-                  ),
+            child: ListView(
+              key: const PageStorageKey('main_habit_scroll'),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              children: [
+                
+                // O calendário agora rola junto com os cards
+                _buildMonthlyCheckinBlocks(),
+
+                if (activeHabits.isEmpty) 
+                  _buildEmptyState()
+                else 
+                  ...activeHabits.asMap().entries.map((entry) => _buildHabitCard(entry.value, entry.key)),
+              ],
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  // CALENDÁRIO ULTRACÓMPACTO: Sem dias da semana e ainda menor
-  Widget _buildMiniCalendar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: TableCalendar(
-        firstDay: DateTime.utc(2023, 1, 1),
-        lastDay: DateTime.utc(2030, 12, 31),
-        focusedDay: DateTime.now(),
-        calendarFormat: CalendarFormat.month,
-        availableCalendarFormats: const {CalendarFormat.month: 'Mês'},
-        
-        // ESCONDE OS DIAS DA SEMANA E DIMINUI A ALTURA
-        daysOfWeekVisible: false, 
-        rowHeight: 28, 
-        
-        headerStyle: const HeaderStyle(
-          formatButtonVisible: false,
-          titleCentered: true,
-          titleTextStyle: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
-          leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white24, size: 20),
-          rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white24, size: 20),
-          headerMargin: EdgeInsets.only(bottom: 4), // Aproxima os quadrados do título
-        ),
-        
-        calendarStyle: CalendarStyle(
-          outsideDaysVisible: false,
-          cellMargin: const EdgeInsets.all(2), // Quase colados
-          
-          defaultTextStyle: const TextStyle(color: Colors.white38, fontSize: 9),
-          weekendTextStyle: const TextStyle(color: Colors.white38, fontSize: 9),
-          
-          // Estilo minimalista para dias vazios
-          defaultDecoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04), 
-            borderRadius: BorderRadius.circular(4), // Mais quadrado
-          ),
-          weekendDecoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(4),
-          ),
-
-          todayTextStyle: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-          todayDecoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: colorPrimary.withOpacity(0.4), width: 1),
-          ),
-
-          selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
-          selectedDecoration: BoxDecoration(
-            color: colorPrimary, 
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        
-        selectedDayPredicate: (day) {
-          String formattedDay = day.toIso8601String().split('T')[0];
-          return checkinHistory.contains(formattedDay);
-        },
       ),
     );
   }
@@ -232,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
     int nextLevelXp = LevelService.xpPerLevel - (totalXp % LevelService.xpPerLevel);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+      margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       decoration: BoxDecoration(
         color: colorSurface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(32),
@@ -285,6 +211,82 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildMonthlyCheckinBlocks() {
+    DateTime now = DateTime.now();
+    int daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    String currentMonthStr = now.month.toString().padLeft(2, '0');
+    String currentYearStr = now.year.toString();
+
+    return Container(
+      // A margem lateral foi removida para alinhar com os cards dentro do ListView
+      margin: const EdgeInsets.only(bottom: 24), 
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorSurface.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("CHECK-IN MENSAL", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              Icon(Icons.calendar_view_month, color: Colors.white24, size: 16),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(daysInMonth, (index) {
+              int day = index + 1;
+              String dayStr = day.toString().padLeft(2, '0');
+              String dateToCheck = "$currentYearStr-$currentMonthStr-$dayStr";
+              
+              bool isCheckedIn = checkinHistory.contains(dateToCheck);
+              bool isFuture = day > now.day;
+              bool isToday = day == now.day;
+
+              Color blockColor;
+              Color borderColor;
+
+              if (isCheckedIn) {
+                blockColor = colorAccent; 
+                borderColor = colorAccent;
+              } else if (isFuture) {
+                blockColor = Colors.transparent; 
+                borderColor = Colors.white.withOpacity(0.05);
+              } else {
+                blockColor = Colors.white.withOpacity(0.05); 
+                borderColor = Colors.transparent;
+              }
+
+              if (isToday && !isCheckedIn) {
+                borderColor = colorAccent.withOpacity(0.5);
+              }
+
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: blockColor,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: borderColor, width: 1.5),
+                  boxShadow: isCheckedIn ? [
+                    BoxShadow(color: colorAccent.withOpacity(0.3), blurRadius: 4, spreadRadius: 1)
+                  ] : [],
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHabitCard(Habit habit, int habitIndex) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -331,7 +333,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _buildSubTaskItem(
                     task.title, 
                     task.isCompleted, 
-                    () => _toggleSubTask(habitIndex, taskIdx)
+                    () => _toggleSubTask(habitIndex, taskIdx),
+                    // NOVO: Passamos a função de abrir o modal apenas se o hábito for o de treino!
+                    habit.id == 'treino_hibrido' 
+                        ? () => showAddLoadDialog(context, task.title) 
+                        : null,
                   );
                 }),
               ],
@@ -342,9 +348,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSubTaskItem(String title, bool isDone, VoidCallback onTap) {
+  // NOVO: A função agora aceita um parâmetro opcional onAddLoad
+  Widget _buildSubTaskItem(String title, bool isDone, VoidCallback onTap, [VoidCallback? onAddLoad]) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onAddLoad, // NOVO: Segurar o clique também abre o modal
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.only(bottom: 12),
@@ -367,6 +375,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: isDone ? TextDecoration.lineThrough : null,
               )),
             ),
+            // NOVO: Se o onAddLoad foi passado (ou seja, é um exercício), exibe o ícone de peso
+            if (onAddLoad != null)
+              IconButton(
+                icon: Icon(Icons.fitness_center, color: isDone ? colorAccent : Colors.white54, size: 20),
+                onPressed: onAddLoad,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(), // Reduz o tamanho clicável do botão para encaixar bem
+              ),
           ],
         ),
       ),
@@ -374,15 +390,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.layers_clear, size: 60, color: colorPrimary.withOpacity(0.2)),
-          const SizedBox(height: 16),
-          Text("MODO STANDBY ATIVO", 
-            style: TextStyle(color: colorPrimary.withOpacity(0.5), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 3)),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.layers_clear, size: 60, color: colorPrimary.withOpacity(0.2)),
+            const SizedBox(height: 16),
+            Text("MODO STANDBY ATIVO", 
+              style: TextStyle(color: colorPrimary.withOpacity(0.5), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 3)),
+          ],
+        ),
       ),
     );
   }

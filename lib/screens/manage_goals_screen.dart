@@ -130,7 +130,7 @@ class _ManageGoalsScreenState extends State<ManageGoalsScreen> {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),

@@ -7,6 +7,7 @@ import '../screens/body_stats_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_screen.dart';
 import '../screens/checkin_screen.dart'; // Importação da nova tela de Ofensiva
+import '../screens/exercise_load_screen.dart'; // NOVO: Importação da tela de carga
 
 class CustomDrawer extends StatefulWidget {
   const CustomDrawer({super.key});
@@ -137,6 +138,12 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   icon: Icons.straighten,
                   label: "MEDIDAS",
                   onTap: () => _animatedNavigate(context, const BodyStatsScreen()),
+                ),
+                // ITEM NOVO: Acessar o Diário de Carga
+                _buildDrawerItem(
+                  icon: Icons.fitness_center,
+                  label: "DIÁRIO DE CARGA",
+                  onTap: () => _animatedNavigate(context, const ExerciseLoadScreen()),
                 ),
                 _buildDrawerItem(
                   icon: Icons.insights,

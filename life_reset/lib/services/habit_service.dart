@@ -3,16 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/task.dart';
 import '../data/habit_catalog.dart';
-
-// Importações necessárias para acessar o gênero salvo no onboarding
-import '../services/storage_service.dart';
-import '../models/player.dart';
+import '../models/exercise_load.dart'; // NOVO: Importação do modelo de carga
 
 class HabitService {
   static const String _historyKeyPrefix = 'habit_history_';
   static const String _lastResetKey = 'last_reset_date'; // Chave para controlar o reset
+  static const String _loadHistoryKey = 'exercise_load_history'; // NOVO: Chave para as cargas
 
-  // NOVO: Verifica se o dia mudou e reseta as tarefas
+  // Verifica se o dia mudou e reseta as tarefas
   static Future<void> checkDailyReset(List<Habit> activeHabits) async {
     final prefs = await SharedPreferences.getInstance();
     final String today = DateTime.now().toString().split(' ')[0];
@@ -78,38 +76,19 @@ class HabitService {
     }
   }
 
-  // Escala de Treino Dinâmica baseada no Gênero
+  // Escala de Treino: Nova divisão semanal
   static Future<void> checkWorkoutTask(List<Habit> activeHabits) async {
-    // Carrega os dados do jogador salvos no onboarding
-    final Player? player = await StorageService.loadPlayer();
-    final String gender = player?.gender ?? 'Feminino'; // Fallback padrão caso não encontre
-
-    Map<int, List<String>> workoutFeminino = {
-      1: ["Cardio leve 15–20min", "Agachamento livre – 4x10", "Leg press – 4x12", "Afundo – 3x10 cada perna", "Cadeira extensora – 3x15", "Elevação pélvica – 4x12", "Abdutor – 3x15"],
-      2: ["Cardio leve 20min", "Puxada na frente – 4x10", "Remada – 4x10", "Face pull – 3x15", "Rosca bíceps – 3x12", "Tríceps pulley – 3x12", "Abdominal – 3x15"],
-      3: ["Cardio escada 20min", "Stiff – 4x10", "Mesa flexora – 4x12", "Hip thrust pesado – 4x8-10", "Coice no cabo – 3x15", "Passada longa – 3x12"],
-      4: ["Caminhada leve 30–40min", "Alongamento completo", "Mobilidade", "Core leve (prancha 3x30s, abdominal curto 3x15)"],
-      5: ["Cardio leve 20min", "Supino – 4x10", "Desenvolvimento ombro – 3x12", "Elevação lateral – 3x15", "Crucifixo máquina – 3x12", "Tríceps – 3x12", "Abdominal – 3x15"],
+    Map<int, List<String>> workout = {
+      1: ["Cardio (1h): caminhada inclinada ou escada", "Agachamento livre – 4x12", "Leg press – 4x12", "Afundo – 3x10 cada perna", "Cadeira extensora – 3x15", "Elevação pélvica – 4x12", "Abdutor – 3x15"],
+      2: ["Stiff – 4x10", "Mesa flexora – 4x12", "Glúteo no cabo – 3x15", "Elevação pélvica pesada – 4x10", "Passada longa – 3x12"],
+      3: ["Cardio: corrida leve ou elíptico", "Supino – 4x10", "Remada – 4x10", "Puxada na frente – 3x12", "Desenvolvimento ombro – 3x12", "Rosca bíceps – 3x12", "Tríceps pulley – 3x12"],
+      4: ["Cardio: escada ou HIIT leve", "Agachamento sumô – 3x15", "Leg press leve – 3x15", "Cadeira extensora – 3x15", "Abdutor – 3x20", "Panturrilha – 4x15", "Circuito leve sem descanso longo"],
+      5: ["Cardio: caminhada inclinada", "Hip thrust – 5x10", "Stiff – 4x10", "Glúteo máquina – 4x12", "Coice no cabo – 3x15", "Abdutor pesado – 4x12"],
       6: ["Cardio: HIIT leve/moderado", "Agachamento", "Flexão", "Remada", "Afundo", "Abdominal"],
       7: ["Cardio", "Alongamento completo", "Mobilidade", "Core leve (prancha, abdominal curto)", "Treino leve"],
     };
 
-    Map<int, List<String>> workoutMasculino = {
-      1: ["Supino reto (barra ou máquina) – 3x10-12", "Supino inclinado – 3x10-12", "Crucifixo (máquina ou halter) – 3x12", "Tríceps corda – 3x12", "Tríceps testa – 3x10", "Cardio: esteira 30min (ritmo moderado)"],
-      2: ["Puxada na frente – 3x10-12", "Remada baixa – 3x10-12", "Remada unilateral – 3x10", "Rosca direta – 3x10", "Rosca alternada – 3x12", "Cardio: esteira 30min"],
-      3: ["Agachamento (livre ou máquina) – 3x10", "Leg press – 3x12", "Cadeira extensora – 3x12", "Cadeira flexora – 3x12", "Panturrilha – 3x15", "Cardio: esteira 30min leve"],
-      4: ["Desenvolvimento – 3x10", "Elevação lateral – 3x12", "Elevação frontal – 3x12", "Abdominal reto – 3x15", "Prancha – 3x30-40s", "Cardio: esteira 30min"],
-      5: ["Circuito leve full body", "Agachamento", "Flexão", "Remada", "Afundo", "Abdominal", "Cardio: esteira 30min (mais intenso)"],
-      6: ["Cardio: HIIT leve/moderado", "Agachamento", "Flexão", "Remada", "Afundo", "Abdominal"],
-      7: ["Cardio", "Alongamento completo", "Mobilidade", "Core leve (prancha, abdominal curto)", "Treino leve"],
-    };
-
-    // Define qual mapa de treino usar
-    Map<int, List<String>> activeWorkout = (gender.toLowerCase() == 'masculino') 
-        ? workoutMasculino 
-        : workoutFeminino;
-
-    List<String> todayTasks = activeWorkout[DateTime.now().weekday] ?? [];
+    List<String> todayTasks = workout[DateTime.now().weekday] ?? [];
     
     for (var habit in activeHabits) {
       if (habit.id == 'treino_hibrido') {
@@ -177,5 +156,62 @@ class HabitService {
 
     double finalProgress = totalScore / (targetDays * 100);
     return finalProgress.clamp(0.0, 1.0);
+  }
+
+  // =========================================================================
+  // NOVAS FUNCIONALIDADES: ACOMPANHAMENTO DE CARGA
+  // =========================================================================
+
+  // Extrai uma lista consolidada dos exercícios a partir da sua escala de treino
+  static List<String> getAvailableExercises() {
+    return [
+      "Agachamento livre", "Agachamento sumô", "Agachamento",
+      "Leg press", "Leg press leve",
+      "Cadeira extensora", "Mesa flexora",
+      "Elevação pélvica", "Elevação pélvica pesada", "Hip thrust",
+      "Abdutor", "Abdutor pesado", "Glúteo máquina", "Glúteo no cabo", "Coice no cabo",
+      "Afundo", "Passada longa", "Stiff",
+      "Supino", "Remada", "Puxada na frente", "Desenvolvimento ombro",
+      "Rosca bíceps", "Tríceps pulley", "Panturrilha", "Flexão"
+    ];
+  }
+
+  // Salva o peso de um exercício no SharedPreferences
+  static Future<void> addExerciseLoad(String exerciseName, double weight) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final newLoad = ExerciseLoad(
+      exerciseName: exerciseName,
+      weight: weight,
+      date: DateTime.now(),
+    );
+
+    // Busca o histórico atual
+    String? historyJson = prefs.getString(_loadHistoryKey);
+    List<dynamic> historyList = historyJson != null ? jsonDecode(historyJson) : [];
+
+    // Adiciona o novo registro e salva
+    historyList.add(newLoad.toMap());
+    await prefs.setString(_loadHistoryKey, jsonEncode(historyList));
+  }
+
+  // Busca o histórico filtrado e ordenado para desenhar o gráfico
+  static Future<List<ExerciseLoad>> getHistoryForExercise(String exerciseName) async {
+    final prefs = await SharedPreferences.getInstance();
+    String? historyJson = prefs.getString(_loadHistoryKey);
+
+    if (historyJson == null) return [];
+
+    List<dynamic> historyList = jsonDecode(historyJson);
+    
+    // Converte de Map para Objeto, filtra pelo nome e ordena pela data (mais antigo -> mais recente)
+    List<ExerciseLoad> loads = historyList
+        .map((item) => ExerciseLoad.fromMap(item as Map<String, dynamic>))
+        .where((e) => e.exerciseName == exerciseName)
+        .toList();
+
+    loads.sort((a, b) => a.date.compareTo(b.date));
+    
+    return loads;
   }
 }
