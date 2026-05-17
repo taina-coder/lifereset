@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/task.dart';
 import '../data/habit_catalog.dart';
+import 'local_database_service.dart';
 
 class HabitService {
   static const String _historyKeyPrefix = 'habit_history_';
@@ -10,9 +10,9 @@ class HabitService {
 
   // NOVO: Verifica se o dia mudou e reseta as tarefas
   static Future<void> checkDailyReset(List<Habit> activeHabits) async {
-    final prefs = await SharedPreferences.getInstance();
     final String today = DateTime.now().toString().split(' ')[0];
-    final String lastReset = prefs.getString(_lastResetKey) ?? "";
+    final String lastReset =
+        await LocalDatabaseService.getValue<String>(_lastResetKey) ?? "";
 
     // Se a data de hoje for diferente da data do último reset (ex: virou meia-noite)
     if (today != lastReset) {
@@ -22,7 +22,7 @@ class HabitService {
         }
       }
       // Atualiza a data do último reset para hoje
-      await prefs.setString(_lastResetKey, today);
+      await LocalDatabaseService.setValue(_lastResetKey, today);
     }
   }
 
@@ -111,18 +111,20 @@ class HabitService {
   }
 
   static Future<void> logHabitAction(String id, double progress) async {
-    final prefs = await SharedPreferences.getInstance();
-    Map history = jsonDecode(prefs.getString('$_historyKeyPrefix$id') ?? '{}');
+    final key = '$_historyKeyPrefix$id';
+    Map history =
+        jsonDecode(await LocalDatabaseService.getValue<String>(key) ?? '{}');
     history[DateTime.now().toString().split(' ')[0]] = progress;
-    await prefs.setString('$_historyKeyPrefix$id', jsonEncode(history));
+    await LocalDatabaseService.setValue(key, jsonEncode(history));
   }
 
   static Future<Map<DateTime, int>> getAggregatedProgress(String? id) async {
-    final prefs = await SharedPreferences.getInstance();
     Map<DateTime, int> aggregated = {};
-    for (var key in prefs.getKeys().where((k) => k.startsWith(_historyKeyPrefix))) {
+    final keys = await LocalDatabaseService.getKeys();
+    for (var key in keys.where((k) => k.startsWith(_historyKeyPrefix))) {
       if (id != null && key != '$_historyKeyPrefix$id') continue;
-      Map history = jsonDecode(prefs.getString(key) ?? '{}');
+      Map history =
+          jsonDecode(await LocalDatabaseService.getValue<String>(key) ?? '{}');
       history.forEach((d, v) => aggregated[DateTime.parse(d)] = (v as num).toInt());
     }
     return aggregated;

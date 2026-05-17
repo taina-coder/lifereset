@@ -11,7 +11,7 @@ class ProgressRecord {
     required this.completed,
   });
 
-  // Converte para JSON para podermos salvar no SharedPreferences
+  // Converte para JSON para podermos salvar no banco local.
   Map<String, dynamic> toJson() => {
         'habitId': habitId,
         'timestamp': timestamp.toIso8601String(),

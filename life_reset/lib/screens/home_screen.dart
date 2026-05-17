@@ -9,7 +9,9 @@ import '../services/attribute_service.dart';
 import '../widgets/custom_drawer.dart';
 import '../models/task.dart';
 import '../services/checkin_service.dart';
-import '../widgets/add_load_dialog.dart'; // NOVO: Importação do widget de registrar carga
+
+// ADICIONADO: Import da nova classe de banco de dados permanente
+import '../services/database_local.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -54,7 +56,13 @@ class _HomeScreenState extends State<HomeScreen> {
     await HabitService.checkWorkoutTask(habits);
     await StorageService.saveActiveHabits(habits);
 
-    final xp = await LevelService.getTotalXp();
+    // ADICIONADO: Lendo o arquivo permanente para evitar perda de cache
+    DatabaseLocal db = DatabaseLocal();
+    Map<String, dynamic> dadosPermanentes = await db.lerDados();
+    
+    // Se existir XP salvo no arquivo de texto permanente, ele usa. Senão, puxa do serviço antigo.
+    final xp = dadosPermanentes['xp'] ?? await LevelService.getTotalXp();
+    
     final history = await CheckinService.getCheckinHistory();
 
     Map<String, double> progressMap = {};
@@ -76,9 +84,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final task = habit.tasks[taskIndex];
     bool isNowCompleted = !task.isCompleted;
     
-    setState(() {
-      task.isCompleted = isNowCompleted;
-    });
+    // CORREÇÃO DO BUG VISUAL: 
+    // Removido o setState daqui de cima. Atualizamos a variável primeiro em background.
+    task.isCompleted = isNowCompleted;
 
     if (isNowCompleted) {
       totalXp = await LevelService.addXp(task.xpValue);
@@ -94,6 +102,14 @@ class _HomeScreenState extends State<HomeScreen> {
     overallProgressMap[habit.id] = await HabitService.getOverallProgress(habit);
     checkinHistory = await CheckinService.getCheckinHistory();
     
+    // ADICIONADO: Salvar o XP no arquivo de texto permanente assim que ele é alterado
+    DatabaseLocal db = DatabaseLocal();
+    Map<String, dynamic> dados = await db.lerDados();
+    dados['xp'] = totalXp;
+    await db.salvarDados(dados);
+
+    // CORREÇÃO DO BUG VISUAL:
+    // O setState fica APENAS aqui no final, depois que todos os dados (incluindo o arquivo) foram salvos com sucesso.
     setState(() {}); 
   }
 
@@ -333,11 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _buildSubTaskItem(
                     task.title, 
                     task.isCompleted, 
-                    () => _toggleSubTask(habitIndex, taskIdx),
-                    // NOVO: Passamos a função de abrir o modal apenas se o hábito for o de treino!
-                    habit.id == 'treino_hibrido' 
-                        ? () => showAddLoadDialog(context, task.title) 
-                        : null,
+                    () => _toggleSubTask(habitIndex, taskIdx)
                   );
                 }),
               ],
@@ -348,11 +360,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // NOVO: A função agora aceita um parâmetro opcional onAddLoad
-  Widget _buildSubTaskItem(String title, bool isDone, VoidCallback onTap, [VoidCallback? onAddLoad]) {
+  Widget _buildSubTaskItem(String title, bool isDone, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onAddLoad, // NOVO: Segurar o clique também abre o modal
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.only(bottom: 12),
@@ -375,14 +385,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: isDone ? TextDecoration.lineThrough : null,
               )),
             ),
-            // NOVO: Se o onAddLoad foi passado (ou seja, é um exercício), exibe o ícone de peso
-            if (onAddLoad != null)
-              IconButton(
-                icon: Icon(Icons.fitness_center, color: isDone ? colorAccent : Colors.white54, size: 20),
-                onPressed: onAddLoad,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(), // Reduz o tamanho clicável do botão para encaixar bem
-              ),
           ],
         ),
       ),

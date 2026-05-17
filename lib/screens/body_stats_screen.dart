@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
+import '../services/local_database_service.dart';
 
 class BodyStatsScreen extends StatefulWidget {
   const BodyStatsScreen({super.key});
@@ -40,8 +40,8 @@ class _BodyStatsScreenState extends State<BodyStatsScreen> {
 
   /// Carrega as medidas salvas e o histórico do gráfico
   Future<void> _loadCurrentStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? historyJson = prefs.getString('body_stats_history');
+    final String? historyJson =
+        await LocalDatabaseService.getValue<String>('body_stats_history');
     
     if (historyJson != null) {
       List<dynamic> decoded = jsonDecode(historyJson);
@@ -86,7 +86,6 @@ class _BodyStatsScreenState extends State<BodyStatsScreen> {
     await StorageService.saveBodyStats(currentStats);
     
     // Atualiza o histórico para o Gráfico
-    final prefs = await SharedPreferences.getInstance();
     String today = DateTime.now().toString().split(' ')[0]; // Data de hoje: YYYY-MM-DD
     
     int index = statsHistory.indexWhere((e) => e['date'] == today);
@@ -106,7 +105,10 @@ class _BodyStatsScreenState extends State<BodyStatsScreen> {
 
     // Ordena por data (para o gráfico não bugar se o tempo passar)
     statsHistory.sort((a, b) => a['date'].compareTo(b['date']));
-    await prefs.setString('body_stats_history', jsonEncode(statsHistory));
+    await LocalDatabaseService.setValue(
+      'body_stats_history',
+      jsonEncode(statsHistory),
+    );
 
     setState(() {}); // Atualiza os gráficos na tela
 

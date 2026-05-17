@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../services/habit_service.dart';
 import '../services/level_service.dart';
 import '../services/attribute_service.dart'; 
+import '../services/exercise_load_service.dart';
 import '../widgets/custom_drawer.dart';
 import '../models/task.dart';
 import '../services/checkin_service.dart';
@@ -74,16 +75,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final habit = activeHabits[habitIndex];
     final task = habit.tasks[taskIndex];
     bool isNowCompleted = !task.isCompleted;
+
+    double? loadKg;
+    if (isNowCompleted && habit.id == 'treino_hibrido') {
+      loadKg = await _askExerciseLoad(task.title);
+      if (loadKg == null) return;
+      if (!mounted) return;
+    }
     
     setState(() {
       task.isCompleted = isNowCompleted;
     });
 
     if (isNowCompleted) {
+      if (habit.id == 'treino_hibrido' && loadKg != null) {
+        await ExerciseLoadService.saveLoad(
+          exerciseName: task.title,
+          loadKg: loadKg,
+        );
+      }
       totalXp = await LevelService.addXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: true);
       await CheckinService.checkInToday(); 
     } else {
+      if (habit.id == 'treino_hibrido') {
+        await ExerciseLoadService.removeTodayLoad(task.title);
+      }
       totalXp = await LevelService.removeXp(task.xpValue);
       await AttributeService.applyTaskReward(task, isAdding: false);
     }
@@ -92,8 +109,122 @@ class _HomeScreenState extends State<HomeScreen> {
     await HabitService.logHabitAction(habit.id, habit.dayProgress * 100);
     overallProgressMap[habit.id] = await HabitService.getOverallProgress(habit);
     checkinHistory = await CheckinService.getCheckinHistory();
-    
+
+    if (!mounted) return;
     setState(() {}); 
+  }
+
+  Future<double?> _askExerciseLoad(String exerciseName) async {
+    final controller = TextEditingController();
+    String? errorText;
+
+    final result = await showDialog<double>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: colorSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: colorAccent.withOpacity(0.25)),
+              ),
+              title: Text(
+                "REGISTRAR CARGA",
+                style: TextStyle(
+                  color: colorAccent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    exerciseName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: TextStyle(
+                      color: colorText,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    decoration: InputDecoration(
+                      suffixText: "KG",
+                      suffixStyle: TextStyle(color: colorAccent, fontWeight: FontWeight.bold),
+                      hintText: "0",
+                      hintStyle: const TextStyle(color: Colors.white12),
+                      errorText: errorText,
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colorAccent.withOpacity(0.7)),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text("CANCELAR"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorAccent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    final normalized = controller.text.trim().replaceAll(',', '.');
+                    final value = double.tryParse(normalized);
+                    if (value == null || value < 0) {
+                      setDialogState(() {
+                        errorText = "Digite uma carga valida";
+                      });
+                      return;
+                    }
+                    Navigator.pop(dialogContext, value);
+                  },
+                  child: const Text(
+                    "SALVAR",
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
   }
 
   @override
