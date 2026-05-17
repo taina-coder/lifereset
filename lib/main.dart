@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'services/local_database_service.dart';
 import 'services/storage_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LocalDatabaseService.initialize();
 
   // Verifica se o player já existe no sistema
   final bool hasPlayer = await StorageService.hasPlayer();

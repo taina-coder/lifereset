@@ -6,6 +6,7 @@ import '../screens/goal_selection_screen.dart';
 import '../screens/body_stats_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_screen.dart';
+import '../screens/exercise_load_screen.dart';
 import '../screens/checkin_screen.dart'; // Importação da nova tela de Ofensiva
 
 class CustomDrawer extends StatefulWidget {
@@ -137,6 +138,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   icon: Icons.straighten,
                   label: "MEDIDAS",
                   onTap: () => _animatedNavigate(context, const BodyStatsScreen()),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.fitness_center,
+                  label: "CARGAS",
+                  onTap: () => _animatedNavigate(context, const ExerciseLoadScreen()),
                 ),
                 _buildDrawerItem(
                   icon: Icons.insights,

@@ -1,12 +1,12 @@
 // ignore_for_file: unused_import
 
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/task.dart';
 import '../models/attribute_stats.dart';
 import '../models/player.dart';
 import 'habit_service.dart';
+import 'local_database_service.dart';
 
 class StorageService {
   static const String _playerKey = 'player_data';
@@ -18,19 +18,16 @@ class StorageService {
   // ==========================================
 
   static Future<bool> hasPlayer() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_playerKey);
+    final data = await LocalDatabaseService.getValue<String>(_playerKey);
     return data != null && data.isNotEmpty;
   }
 
   static Future<void> savePlayer(Player player) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_playerKey, jsonEncode(player.toJson()));
+    await LocalDatabaseService.setValue(_playerKey, jsonEncode(player.toJson()));
   }
 
   static Future<Player> loadPlayer() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_playerKey);
+    final data = await LocalDatabaseService.getValue<String>(_playerKey);
     if (data != null) {
       return Player.fromJson(jsonDecode(data));
     }
@@ -65,13 +62,11 @@ class StorageService {
   // ==========================================
 
   static Future<void> saveBodyStats(Map<String, double> stats) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_body_stats', jsonEncode(stats));
+    await LocalDatabaseService.setValue('user_body_stats', jsonEncode(stats));
   }
 
   static Future<Map<String, double>?> loadBodyStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? data = prefs.getString('user_body_stats');
+    String? data = await LocalDatabaseService.getValue<String>('user_body_stats');
     if (data == null) return null;
     final Map<String, dynamic> decoded = jsonDecode(data);
     return decoded.map((key, value) => MapEntry(key, value.toDouble()));
@@ -82,21 +77,19 @@ class StorageService {
   // ==========================================
 
   static Future<List<Habit>> loadActiveHabits() async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String>? habitsJson = prefs.getStringList(_activeHabitsKey);
-    if (habitsJson == null) return [];
+    List<String> habitsJson = await LocalDatabaseService.getStringList(_activeHabitsKey);
+    if (habitsJson.isEmpty) return [];
     return habitsJson.map((jsonStr) => Habit.fromJson(jsonDecode(jsonStr))).toList();
   }
 
   static Future<void> saveActiveHabits(List<Habit> habits) async {
-    final prefs = await SharedPreferences.getInstance();
     
     // Injeta a lógica do HabitService (Cronograma AWS e Treino do Dia)
     await HabitService.checkAWSTasks(habits);
     await HabitService.checkWorkoutTask(habits);
 
     List<String> habitsJson = habits.map((h) => jsonEncode(h.toJson())).toList();
-    await prefs.setStringList(_activeHabitsKey, habitsJson);
+    await LocalDatabaseService.setStringList(_activeHabitsKey, habitsJson);
   }
 
   static Future<void> updateHabitsFromCatalog(List<Habit> catalogHabits) async {
@@ -130,28 +123,29 @@ class StorageService {
   // ==========================================
 
   static Future<void> saveAttributeStats(AttributeStats stats) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_statsKey, jsonEncode(stats.toJson()));
+    await LocalDatabaseService.setValue(_statsKey, jsonEncode(stats.toJson()));
   }
 
   static Future<AttributeStats> loadAttributeStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_statsKey);
+    final data = await LocalDatabaseService.getValue<String>(_statsKey);
     return data != null ? AttributeStats.fromJson(jsonDecode(data)) : AttributeStats();
   }
 
-  static Future<void> saveProfileImage(String path) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('profile_image_path', path);
+  static Future<String> saveProfileImage(String path) async {
+    final savedFile = await LocalDatabaseService.copyFileToDatabaseDirectory(
+      path,
+      'profile_image.jpg',
+    );
+    await LocalDatabaseService.setValue('profile_image_path', savedFile.path);
+    return savedFile.path;
   }
 
   static Future<String?> loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('profile_image_path');
+    return LocalDatabaseService.getValue<String>('profile_image_path');
   }
 
   static Future<void> clearAllData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await LocalDatabaseService.clearDatabase();
+    await LocalDatabaseService.clearCache();
   }
 }

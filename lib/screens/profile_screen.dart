@@ -57,8 +57,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (pickedFile != null) {
-        await StorageService.saveProfileImage(pickedFile.path);
-        setState(() => imagePath = pickedFile.path);
+        final savedPath = await StorageService.saveProfileImage(pickedFile.path);
+        setState(() => imagePath = savedPath);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

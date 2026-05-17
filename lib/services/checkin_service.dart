@@ -1,26 +1,24 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'local_database_service.dart';
 
 class CheckinService {
   static const String _datesKey = 'checkin_dates_history';
 
   // Salva a data de hoje no histórico
   static Future<void> checkInToday() async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> dates = prefs.getStringList(_datesKey) ?? [];
+    List<String> dates = await getCheckinHistory();
     
     // Pega apenas a data (YYYY-MM-DD), ignorando a hora
     String today = DateTime.now().toIso8601String().split('T')[0];
 
     if (!dates.contains(today)) {
       dates.add(today);
-      await prefs.setStringList(_datesKey, dates);
+      await LocalDatabaseService.setStringList(_datesKey, dates);
     }
   }
 
   // Carrega todas as datas que você fez check-in
   static Future<List<String>> getCheckinHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_datesKey) ?? [];
+    return LocalDatabaseService.getStringList(_datesKey);
   }
 
   // Calcula os dias consecutivos (A Ofensiva/Streak)
